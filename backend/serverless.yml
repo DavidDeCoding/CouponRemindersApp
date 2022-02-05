@@ -9,6 +9,19 @@ provider:
   region: us-west-1
   stage: ${opt:stage, "dev"}
   lambdaHashingVersion: "20201221"
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource:
+        - { "Fn::GetAtt": ["CouponsDynamoDBTable", "Arn"] }
+  environment:
+    COUPONS_TABLE: ${self:custom.tableName}
 
 functions:
   app:
@@ -43,11 +56,31 @@ functions:
 
 plugins:
   - serverless-python-requirements
-
 custom:
   pythonRequirements:
     dockerizePip: true
     dockerFile: Dockerfile
+  tableName: 'coupons-table-${self:provider.stage}'
+
+resources:
+  Resources:
+    CouponsDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+          - AttributeName: timestamp
+            AttributeType: N
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+          - AttributeName: timestamp
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.tableName}
 
 layers:
   tesseractAl2:
