@@ -18,10 +18,17 @@ provider:
         - dynamodb:PutItem
         - dynamodb:UpdateItem
         - dynamodb:DeleteItem
+        - dynamodb:DescribeStream
+        - dynamodb:GetRecords
+        - dynamodb:GetShardIterator
+        - dynamodb:ListStreams
       Resource:
-        - { "Fn::GetAtt": ["CouponsDynamoDBTable", "Arn"] }
+        - { "Fn::GetAtt": ["RawCouponsDynamoDBTable", "Arn"] }
+        - { "Fn::GetAtt": ["RawCouponsDynamoDBTable", "StreamArn"] }
+        - { "Fn::GetAtt": ["ProcessedCouponsDynamoDBTable", "Arn"] }
   environment:
-    COUPONS_TABLE: ${self:custom.tableName}
+    RAW_COUPONS_TABLE: ${self:custom.rawCouponsTableName}
+    PROCESSED_COUPONS_TABLE: ${self:custom.processedCouponsTableName}
 
 functions:
   app:
@@ -44,27 +51,56 @@ functions:
         - "dist/**"
         - "tesseract/**"
     handler: coupon_reminders.main.handler
+    environment:
+      STAGE: ${self:provider.stage}
+    events:
+      - http:
+          path: /{proxy+}
+          method: any
+  coupon_processor:
+    package:
+      include:
+        - "coupon_reminders"
+      exclude:
+        - "requirements.txt"
+        - "package.json"
+        - "package-lock.json"
+        - ".serverless/**"
+        - ".virtualenv/**"
+        - "node_modules/**"
+        - ".pytest_cache"
+        - "tests/**"
+        - ".gitignore"
+        - "poetry.lock"
+        - "pyproject.toml"
+        - "README.md"
+        - "dist/**"
+        - "tesseract/**"
+    handler: coupon_reminders.coupon_processor.handler
     timeout: 60
     environment:
       STAGE: ${self:provider.stage}
     layers:
       - { Ref: TesseractAl2LambdaLayer }
     events:
-      - http:
-          path: /{proxy+}
-          method: any
+      - stream:
+          type: dynamodb
+          arn:
+            Fn::GetAtt: [ RawCouponsDynamoDBTable, StreamArn ]
 
 plugins:
   - serverless-python-requirements
+
 custom:
   pythonRequirements:
     dockerizePip: true
     dockerFile: Dockerfile
-  tableName: 'coupons-table-${self:provider.stage}'
+  rawCouponsTableName: 'raw-coupons-table-${self:provider.stage}'
+  processedCouponsTableName: 'processed-coupons-table-${self:provider.stage}'
 
 resources:
   Resources:
-    CouponsDynamoDBTable:
+    RawCouponsDynamoDBTable:
       Type: 'AWS::DynamoDB::Table'
       Properties:
         AttributeDefinitions:
@@ -80,7 +116,26 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-        TableName: ${self:custom.tableName}
+        TableName: ${self:custom.rawCouponsTableName}
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+    ProcessedCouponsDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+          - AttributeName: timestamp
+            AttributeType: N
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+          - AttributeName: timestamp
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.processedCouponsTableName}
 
 layers:
   tesseractAl2:
