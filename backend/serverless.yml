@@ -23,12 +23,16 @@ provider:
         - dynamodb:GetShardIterator
         - dynamodb:ListStreams
       Resource:
-        - { "Fn::GetAtt": ["RawCouponsDynamoDBTable", "Arn"] }
-        - { "Fn::GetAtt": ["RawCouponsDynamoDBTable", "StreamArn"] }
-        - { "Fn::GetAtt": ["ProcessedCouponsDynamoDBTable", "Arn"] }
+        - { "Fn::GetAtt": ["CouponsDynamoDBTable", "Arn"] }
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+        - s3:GetObject
+      Resource:
+        - { "Fn::GetAtt": ["CouponsS3Bucket", "Arn"] }
   environment:
-    RAW_COUPONS_TABLE: ${self:custom.rawCouponsTableName}
-    PROCESSED_COUPONS_TABLE: ${self:custom.processedCouponsTableName}
+    COUPONS_TABLE: ${self:custom.couponsTableName}
+    COUPONS_BUCKET: ${self:custom.couponsBucketName}
 
 functions:
   app:
@@ -83,10 +87,10 @@ functions:
     layers:
       - { Ref: TesseractAl2LambdaLayer }
     events:
-      - stream:
-          type: dynamodb
-          arn:
-            Fn::GetAtt: [ RawCouponsDynamoDBTable, StreamArn ]
+      - s3:
+          bucket: ${self:custom.couponsBucketName}
+          event: s3:ObjectCreated:*
+          existing: true
 
 plugins:
   - serverless-python-requirements
@@ -95,12 +99,12 @@ custom:
   pythonRequirements:
     dockerizePip: true
     dockerFile: Dockerfile
-  rawCouponsTableName: 'raw-coupons-table-${self:provider.stage}'
-  processedCouponsTableName: 'processed-coupons-table-${self:provider.stage}'
+  couponsTableName: 'coupons-table-${self:provider.stage}'
+  couponsBucketName: 'coupons-bucket-${self:provider.stage}'
 
 resources:
   Resources:
-    RawCouponsDynamoDBTable:
+    CouponsDynamoDBTable:
       Type: 'AWS::DynamoDB::Table'
       Properties:
         AttributeDefinitions:
@@ -116,26 +120,11 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-        TableName: ${self:custom.rawCouponsTableName}
-        StreamSpecification:
-          StreamViewType: NEW_AND_OLD_IMAGES
-    ProcessedCouponsDynamoDBTable:
-      Type: 'AWS::DynamoDB::Table'
+        TableName: ${self:custom.couponsTableName}
+    CouponsS3Bucket:
+      Type: 'AWS::S3::Bucket'
       Properties:
-        AttributeDefinitions:
-          - AttributeName: userId
-            AttributeType: S
-          - AttributeName: timestamp
-            AttributeType: N
-        KeySchema:
-          - AttributeName: userId
-            KeyType: HASH
-          - AttributeName: timestamp
-            KeyType: RANGE
-        ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
-        TableName: ${self:custom.processedCouponsTableName}
+        BucketName: ${self:custom.couponsBucketName}
 
 layers:
   tesseractAl2:

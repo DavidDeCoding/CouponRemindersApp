@@ -29,8 +29,25 @@ export default function App() {
 
         if (!result.cancelled) {
             console.log(result.uri);
-            setImage(result.uri);
+            await uploadToS3(result);
         }
+    };
+
+    const uploadToS3 = async (result) => {
+        const img = await fetch(result.uri);
+        const imgBlob = await img.blob();
+
+        const requestOptions = {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/octet-stream' },
+            body: imgBlob
+        };
+        await fetch(
+                '',
+                requestOptions)
+            .then(response => response.text())
+            .then(data => console.log(data))
+            .catch(err => console.error(err));
     };
 
     const data = [
