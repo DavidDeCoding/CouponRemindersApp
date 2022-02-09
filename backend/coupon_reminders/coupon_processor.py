@@ -2,7 +2,6 @@ from coupon_reminders.services import processed_coupon
 
 
 def handler(event, context):
-    print(event)
     for event in event["Records"]:
         if event["eventName"] == "ObjectCreated:Put":
             image_full_name = event["s3"]["object"]["key"]

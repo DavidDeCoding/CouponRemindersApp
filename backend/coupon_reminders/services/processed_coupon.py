@@ -20,7 +20,6 @@ def process_and_store(
     image = image_response['Body'].read()
     image_base64 = base64.b64encode(image)
     processed_text = ocr(image_base64)
-    print(f"ProcessedText: {processed_text}")
 
     user_id, timestamp, image_id = image_full_name.split(".")[0].split("/")
     db_client.put_item(

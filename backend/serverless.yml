@@ -29,7 +29,7 @@ provider:
         - s3:PutObject
         - s3:GetObject
       Resource:
-        - { "Fn::GetAtt": ["CouponsS3Bucket", "Arn"] }
+        - { "Fn::Join": ["", [{"Fn::GetAtt": ["CouponsS3Bucket", "Arn"]}, "/*"]] }
   environment:
     COUPONS_TABLE: ${self:custom.couponsTableName}
     COUPONS_BUCKET: ${self:custom.couponsBucketName}
