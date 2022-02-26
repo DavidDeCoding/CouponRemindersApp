@@ -71,12 +71,16 @@ const App: React.FunctionComponent<AppProps> = () => {
             })
             .catch(error => console.log(error));
 
+
+        const userInfo = await Auth.currentUserInfo();
+        const { username } = userInfo;
+
         const addCouponRequestOptions = {
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${(await Auth.currentSession()).getIdToken().getJwtToken()}`
             },
-            body: { "user_id": "test" }
+            body: { "user_id": username }
         }
         const s3URL = await API
             .post(COUPON_REMINDERS_BACKEND_NAME, COUPON_REMINDERS_BACKEND_ADD_COUPON_PATH, addCouponRequestOptions)
@@ -102,17 +106,23 @@ const App: React.FunctionComponent<AppProps> = () => {
             .catch(error => console.error(error));
     };
 
-    // 6. List Uploaded Coupons
+    // 4. List Uploaded Coupons
     const [couponList, setCouponList] = useState([]);
 
     useEffect(async () => {
+        const userInfo = await Auth.currentUserInfo();
+        const { username } = userInfo;
+
         const getCouponsRequestOptions = {
             headers: {
                 'Authorization': `Bearer ${(await Auth.currentSession()).getIdToken().getJwtToken()}`
             }
         };
         await API
-            .get(COUPON_REMINDERS_BACKEND_NAME, COUPON_REMINDERS_BACKEND_GET_COUPONS_PATH + "/test", getCouponsRequestOptions)
+            .get(
+                COUPON_REMINDERS_BACKEND_NAME,
+                `${COUPON_REMINDERS_BACKEND_GET_COUPONS_PATH}/${username}`,
+                getCouponsRequestOptions)
             .then(async response => {
                 setCouponList(response['coupons']);
             })
